@@ -19,6 +19,7 @@ export default function App() {
     try {
       const res = await lookupByEsiId(esiId);
       if (res.data) {
+        console.log('[App] lookup result:', res.data);
         setState({ status: 'success', result: res.data });
       } else {
         setState({ status: 'not_found' });

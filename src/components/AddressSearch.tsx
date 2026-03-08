@@ -21,6 +21,7 @@ export function AddressSearch({ onSelect }: Props) {
       setResults(res.data);
       setOpen(res.data.length > 0);
       setActiveIndex(-1);
+      console.log('[AddressSearch] suggestions:', res.data);
     } catch {
       setResults([]); setOpen(false);
     }
