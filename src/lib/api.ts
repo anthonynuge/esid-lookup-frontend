@@ -3,10 +3,11 @@ import type { SearchResponse, LookupResponse } from "../types";
 export async function searchAddresses(
   q: string,
   limit = 10,
+  zip?: string,
 ): Promise<SearchResponse> {
-  const res = await fetch(
-    `/api/v1/search?q=${encodeURIComponent(q)}&limit=${limit}`,
-  );
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  if (zip) params.set('zip', zip);
+  const res = await fetch(`/api/v1/search?${params}`);
   if (!res.ok) throw new Error(`Search failed: ${res.status}`);
   return res.json() as Promise<SearchResponse>;
 }
