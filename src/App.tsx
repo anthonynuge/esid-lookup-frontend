@@ -13,7 +13,6 @@ type State =
 
 const STATS = [
   { value: '13M+', label: 'ESID Records' },
-  { value: '4', label: 'Texas TDSPs' },
   { value: '24hr', label: 'Data Refresh Cycle' },
   { value: '<100ms', label: 'Avg. Response Time' },
 ] as const;
@@ -22,9 +21,9 @@ export default function App() {
   const [state, setState] = useState<State>({ status: 'idle' });
   const panelRef = useRef<HTMLDivElement>(null);
 
-  function scrollToPanel() {
-    panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
+  // function scrollToPanel() {
+  //   panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  // }
 
   async function handleSelect(esiId: string) {
     setState({ status: 'loading' });
@@ -41,7 +40,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div className="min-h-screen bg-[#0a0a0a] text-white relative">
       <div
         className="absolute inset-0 opacity-[0.12] pointer-events-none"
         style={{
@@ -63,9 +62,9 @@ export default function App() {
           </h1>
           <p className="text-slate-400 text-lg max-w-xl mb-8">
             Enter your service address to instantly locate your ESID and utility provider information.
-            Our system synchronizes daily with ERCOT to ensure data accuracy across all Texas service territories.
+            The system synchronizes daily with ERCOT to ensure data accuracy across all Texas service territories.
           </p>
-          <div className="flex flex-wrap gap-3 mb-14">
+          {/* <div className="flex flex-wrap gap-3 mb-14">
             <button
               type="button"
               onClick={scrollToPanel}
@@ -80,7 +79,7 @@ export default function App() {
             >
               View Architecture
             </button>
-          </div>
+          </div> */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {STATS.map(({ value, label }) => (
               <div key={label}>
@@ -107,6 +106,9 @@ export default function App() {
             {state.status === 'success' && <EsidCard result={state.result} />}
           </div>
         </div>
+        <footer className="absolute bottom-0 left-0 right-0 flex h-8 items-center justify-between pt-1 pb-[1px] text-xs lg:pt-2 lg:pb-2">
+          <span className="font-mono mx-auto">© {new Date().getFullYear()} AVQN.dev</span>
+        </footer>
       </section>
     </div>
   );
