@@ -51,7 +51,7 @@ export default function App() {
           backgroundSize: '24px 24px',
         }}
       />
-      <section className="relative min-h-screen flex flex-col lg:flex-row lg:items-center lg:justify-between gap-12 lg:gap-16 max-w-[1440px] mx-auto px-4">
+      <section className="relative min-h-screen flex flex-col lg:flex-row lg:items-center lg:justify-between gap-12 lg:gap-16 max-w-[1440px] mx-auto px-4 pt-8 md:pt-0">
         {/* Left: copy + stats */}
         <div className="lg:flex-1 lg:pt-8 max-w-[600px]">
           <div className="inline-flex items-center rounded-md border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-white mb-8">
