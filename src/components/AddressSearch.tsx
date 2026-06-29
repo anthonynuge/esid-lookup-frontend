@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { searchAddresses } from '@/lib/api';
+import { formatStreet, formatZip, formatFullAddress, parseAddressQuery } from '@/lib/utils';
 import type { SearchResult } from '@/types';
 import { MapPin, X } from 'lucide-react';
 
@@ -8,8 +9,12 @@ interface Props {
   onSelect: (esiId: string) => void;
 }
 
+// Min street chars before searching. A ZIP scopes the query (cheap, >=2);
+// un-scoped street-prefix search must be selective enough to stay fast (>=4).
+const MIN_WITH_ZIP = 2;
+const MIN_NO_ZIP = 4;
+
 export function AddressSearch({ onSelect }: Props) {
-  const [zip, setZip] = useState('');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -19,22 +24,17 @@ export function AddressSearch({ onSelect }: Props) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addressRef = useRef<HTMLInputElement>(null);
 
-  const zipValid = /^\d{5}$/.test(zip);
+  const { street, zip } = parseAddressQuery(query);
+  const minLen = zip ? MIN_WITH_ZIP : MIN_NO_ZIP;
 
   useEffect(() => {
-    if (zipValid) addressRef.current?.focus();
-  }, [zipValid]);
+    addressRef.current?.focus();
+  }, []);
 
-  useEffect(() => {
-    setQuery('');
-    setResults([]);
-    setOpen(false);
-    setLoading(false);
-    setSelected(false);
-  }, [zip]);
-
-  const search = useCallback(async (q: string, z: string) => {
-    if (q.length < 2) {
+  const runSearch = useCallback(async (raw: string) => {
+    const parsed = parseAddressQuery(raw);
+    const min = parsed.zip ? MIN_WITH_ZIP : MIN_NO_ZIP;
+    if (parsed.street.length < min) {
       setResults([]);
       setOpen(false);
       setLoading(false);
@@ -42,7 +42,7 @@ export function AddressSearch({ onSelect }: Props) {
     }
     setLoading(true);
     try {
-      const res = await searchAddresses(q, 10, z);
+      const res = await searchAddresses(parsed.street, 10, parsed.zip);
       setResults(res.data);
       setOpen(true);
       setActiveIndex(-1);
@@ -55,16 +55,17 @@ export function AddressSearch({ onSelect }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!zipValid || selected) return;
+    if (selected) return;
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => search(query, zip), 300);
+    timerRef.current = setTimeout(() => runSearch(query), 300);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [query, zip, zipValid, selected, search]);
+  }, [query, selected, runSearch]);
 
   function pick(item: SearchResult) {
-    setQuery(item.full_address);
+    // Replace the input with the full picked address (street, city, state ZIP).
+    setQuery(formatFullAddress(item));
     setResults([]);
     setOpen(false);
     setLoading(false);
@@ -101,15 +102,6 @@ export function AddressSearch({ onSelect }: Props) {
     <div className="rounded-xl border border-white/20 bg-white/5 p-6 shadow-xl backdrop-blur-xl z-10">
       <h2 className="text-lg font-semibold text-white mb-4">Service Address</h2>
       <div className="flex flex-col gap-3 w-full">
-        <Input
-          value={zip}
-          onChange={(e) => setZip(e.target.value.replace(/\D/g, '').slice(0, 5))}
-          placeholder="Enter ZIP code"
-          autoComplete="postal-code"
-          inputMode="numeric"
-          maxLength={5}
-          className="h-11 bg-white/10 border-white/20 text-white placeholder:text-slate-400 focus-visible:ring-white/30"
-        />
         <div className="relative w-full">
           <div className="relative flex items-center">
             <MapPin className="absolute left-3 h-5 w-5 text-slate-400 pointer-events-none" />
@@ -122,12 +114,11 @@ export function AddressSearch({ onSelect }: Props) {
               }}
               onKeyDown={handleKey}
               onBlur={() => setOpen(false)}
-              placeholder={zipValid ? 'Start typing an address…' : 'Enter ZIP code first'}
-              disabled={!zipValid}
+              placeholder="Start typing an address (add a ZIP to narrow)…"
               autoComplete="off"
               aria-autocomplete="list"
               aria-expanded={open}
-              className="h-11 pl-10 pr-10 bg-white/10 border-white/20 text-white placeholder:text-slate-400 disabled:opacity-50 focus-visible:ring-white/30"
+              className="h-11 pl-10 pr-10 bg-white/10 border-white/20 text-white placeholder:text-slate-400 focus-visible:ring-white/30"
             />
             {query.length > 0 && (
               <button
@@ -141,9 +132,9 @@ export function AddressSearch({ onSelect }: Props) {
             )}
           </div>
           <p className="mt-2 text-sm text-slate-400">
-            Try: &quot;123 Main&quot;, &quot;Dallas&quot;, &quot;Oncor&quot;, or &quot;Houston&quot; to see example results
+            Try &quot;1234 Main&quot; or include a ZIP: &quot;1234 Main 75202&quot;.
           </p>
-          {(loading || open) && query.length >= 2 && (
+          {(loading || open) && street.length >= minLen && (
             <ul className="absolute z-50 mt-2 w-full rounded-lg border border-white/20 bg-zinc-900 shadow-xl max-h-64 overflow-auto py-1 scrollbar-dark">
               {loading ? (
                 <li className="px-4 py-3 text-sm text-slate-400 flex items-center gap-2">
@@ -155,7 +146,8 @@ export function AddressSearch({ onSelect }: Props) {
                 </li>
               ) : results.length === 0 ? (
                 <li className="px-4 py-3 text-sm text-slate-400">
-                  No addresses found for <span className="font-medium text-white">&quot;{query}&quot;</span> in {zip}
+                  No addresses found for <span className="font-medium text-white">&quot;{street}&quot;</span>
+                  {zip ? ` in ${zip}` : ''}
                 </li>
               ) : (
                 results.map((item, i) => (
@@ -164,9 +156,9 @@ export function AddressSearch({ onSelect }: Props) {
                     onMouseDown={() => pick(item)}
                     className={`cursor-pointer px-4 py-2.5 text-sm hover:bg-white/10 ${i === activeIndex ? 'bg-white/10' : ''}`}
                   >
-                    <span className="font-medium text-white">{item.full_address}</span>
+                    <span className="font-medium text-white">{formatStreet(item.street, item.unit)}</span>
                     <span className="text-slate-400 ml-1">
-                      {item.city}, {item.zip_code}
+                      {item.city}, {formatZip(item.zip_code)}
                     </span>
                   </li>
                 ))

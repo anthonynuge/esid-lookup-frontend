@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { formatFullAddress, formatLoadZone } from '@/lib/utils';
 import type { LookupResult } from '@/types';
 
 const matchLabels: Record<LookupResult['match_type'], { label: string; className: string }> = {
@@ -19,7 +20,12 @@ function InfoItem({ label, value }: { label: string; value?: string | null }) {
 
 export function EsidCard({ result }: { result: LookupResult }) {
   const match = matchLabels[result.match_type];
-  const isActive = (result.status || '').toLowerCase() === 'active';
+  const { address, delivery_company, congestion_zone, premise } = result;
+  const fullAddress = formatFullAddress(address);
+  const isActive = (premise.status || '').toLowerCase() === 'active';
+  const lastUpdated = result.last_updated
+    ? new Date(result.last_updated)
+    : null;
 
   return (
     <div className="mt-6 rounded-xl border border-white/20 bg-white/5 shadow-xl backdrop-blur-xl overflow-hidden">
@@ -30,7 +36,7 @@ export function EsidCard({ result }: { result: LookupResult }) {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold text-white">Electric Service Information</h2>
-                <p className="text-sm text-slate-400 mt-0.5">{result.full_address}</p>
+                <p className="text-sm text-slate-400 mt-0.5">{fullAddress}</p>
               </div>
               <Badge
                 className={
@@ -39,24 +45,29 @@ export function EsidCard({ result }: { result: LookupResult }) {
                     : match.className
                 }
               >
-                {isActive ? 'Active' : match.label}
+                {isActive ? 'Active' : premise.status || match.label}
               </Badge>
             </div>
           </div>
           <div className="px-6 pb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <InfoItem label="ESID Number" value={result.esiid} />
-            <InfoItem label="Utility Provider (TDSP)" value={result.tdsp_name} />
-            <InfoItem label="Service Address" value={result.full_address} />
-            <InfoItem label="Premise Type" value={result.premise_type} />
-            <InfoItem label="Load Zone" value={result.load_zone} />
-            {result.tdsp_doe_code != null && result.tdsp_doe_code !== '' && (
-              <InfoItem label="TDSP DOE Code" value={result.tdsp_doe_code} />
-            )}
+            <InfoItem label="Utility Provider (TDSP)" value={delivery_company?.name} />
+            <InfoItem label="Premise Type" value={premise.premise_type} />
+            <InfoItem label="Load Zone" value={formatLoadZone(congestion_zone.load_zone)} />
+            <InfoItem label="County" value={premise.county} />
+            <InfoItem label="Switch Hold" value={premise?.switch_hold ? 'Yes' : 'No'} />
+            <InfoItem label="AMS" value={premise?.ams ? 'Yes' : 'No'} />
+            <InfoItem label="TDSP Code" value={delivery_company?.dc_code} />
           </div>
           <div className="px-6 py-3 border-t border-white/10 bg-white/5">
             <p className="text-xs text-slate-500">
               Data sourced from ERCOT TDSP ESI ID Extract (Report ID 203). Last synchronized:{' '}
-              {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.
+              {(lastUpdated ?? new Date()).toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+              .
             </p>
           </div>
         </div>

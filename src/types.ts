@@ -1,6 +1,7 @@
 export interface SearchResult {
   esiid: string;
-  full_address: string;
+  street: string | null;
+  unit: string | null;
   city: string;
   state: string;
   zip_code: string;
@@ -12,20 +13,39 @@ export interface SearchResponse {
   data: SearchResult[];
 }
 
+export type MatchType = 'exact' | 'fuzzy' | 'esiid';
+
 export interface LookupResult {
   esiid: string;
-  full_address: string;
-  street: string | null;
-  city: string;
-  state: string;
-  zip_code: string;
-  status: string;
-  premise_type: string | null;
-  tdsp_name: string | null;
-  tdsp_doe_code?: string | null;
-  load_zone: string | null;
-  match_type: 'exact' | 'fuzzy' | 'esiid';
+  match_type: MatchType;
   similarity_score?: number | null;
+  address: {
+    street: string | null;
+    unit: string | null;
+    city: string;
+    state: string;
+    zip_code: string;
+  };
+  // null only when the row has no resolvable TDSP at all
+  delivery_company: {
+    duns: string | null;
+    dc_code: string | null;
+    name: string | null;
+    region: string | null;
+  } | null;
+  congestion_zone: {
+    load_zone: string | null;   // raw, e.g. 'LZ_HOUSTON' — strip 'LZ_' for display
+    confidence: string | null;
+  };
+  premise: {
+    status: string;
+    premise_type: string | null;
+    power_region: string | null;
+    ams: boolean | null;
+    switch_hold: boolean | null;
+    county: string | null;
+  };
+  last_updated: string | null;
 }
 
 export interface LookupResponse {
