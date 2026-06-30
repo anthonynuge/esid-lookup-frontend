@@ -8,6 +8,8 @@ import { MapPin, X } from 'lucide-react';
 
 interface Props {
   onSelect: (esiId: string) => void;
+  /** Enter pressed with no suggestion to pick (empty results) — raw query text. */
+  onSubmit?: (raw: string) => void;
 }
 
 // Min street chars before searching. A ZIP scopes the query (cheap, >=2);
@@ -15,7 +17,7 @@ interface Props {
 const MIN_WITH_ZIP = 2;
 const MIN_NO_ZIP = 4;
 
-export function AddressSearch({ onSelect }: Props) {
+export function AddressSearch({ onSelect, onSubmit }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -83,7 +85,27 @@ export function AddressSearch({ onSelect }: Props) {
     addressRef.current?.focus();
   }
 
+  // Enter with nothing to pick: close the dropdown and hand the raw query up so the
+  // app can show a regulated-area / not-found card.
+  function submit() {
+    setResults([]);
+    setOpen(false);
+    setSelected(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    onSubmit?.(query);
+  }
+
   function handleKey(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') {
+      // Allow Enter even when the dropdown is closed/empty so users can submit a
+      // regulated-area address that returns no suggestions.
+      if (street.length < minLen) return;
+      e.preventDefault();
+      if (activeIndex >= 0) pick(results[activeIndex]);
+      else if (results.length > 0) pick(results[0]); // auto-pick top suggestion
+      else submit();
+      return;
+    }
     if (!open) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -91,9 +113,6 @@ export function AddressSearch({ onSelect }: Props) {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActiveIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' && activeIndex >= 0) {
-      e.preventDefault();
-      pick(results[activeIndex]);
     } else if (e.key === 'Escape') {
       setOpen(false);
     }

@@ -1,7 +1,10 @@
 import { useState, useRef } from 'react';
 import { AddressSearch } from './components/AddressSearch';
 import { EsidCard } from './components/EsidCard';
+import { RegulatedCard } from './components/RegulatedCard';
 import { lookupByEsiId } from './lib/api';
+import { parseAddressQuery } from './lib/utils';
+import { detectRegulatedArea, type RegulatedArea } from './lib/regulated';
 import type { LookupResult } from './types';
 
 type State =
@@ -9,6 +12,7 @@ type State =
   | { status: 'loading' }
   | { status: 'success'; result: LookupResult }
   | { status: 'not_found' }
+  | { status: 'regulated'; area: RegulatedArea; query: string }
   | { status: 'error'; message: string };
 
 const STATS = [
@@ -36,6 +40,18 @@ export default function App() {
       }
     } catch (err) {
       setState({ status: 'error', message: err instanceof Error ? err.message : 'Unknown error' });
+    }
+  }
+
+  // Enter with no suggestion to pick (empty results): if the address looks like a
+  // regulated municipal/co-op area, surface a card explaining it; else "not found".
+  function handleSubmit(raw: string) {
+    const { zip } = parseAddressQuery(raw);
+    const area = detectRegulatedArea(raw, zip);
+    if (area) {
+      setState({ status: 'regulated', area, query: raw.trim() });
+    } else {
+      setState({ status: 'not_found' });
     }
   }
 
@@ -92,7 +108,7 @@ export default function App() {
 
         {/* Right: glass search + results */}
         <div ref={panelRef} className="lg:w-[600px] lg:shrink-0 flex flex-col ">
-          <AddressSearch onSelect={handleSelect} />
+          <AddressSearch onSelect={handleSelect} onSubmit={handleSubmit} />
           <div className="mt-4 min-h-[320px] flex flex-col justify-start">
             {state.status === 'loading' && (
               <p className="text-sm text-slate-400 text-center py-8">Loading…</p>
@@ -104,6 +120,7 @@ export default function App() {
               <p className="text-sm text-red-400 text-center py-8">{state.message}</p>
             )}
             {state.status === 'success' && <EsidCard result={state.result} />}
+            {state.status === 'regulated' && <RegulatedCard area={state.area} query={state.query} />}
           </div>
         </div>
         <footer className="absolute bottom-0 left-0 right-0 flex h-8 items-center justify-between pt-1 pb-[1px] text-xs lg:pt-2 lg:pb-2">
