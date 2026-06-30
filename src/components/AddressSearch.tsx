@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { searchAddresses } from '@/lib/api';
 import { formatStreet, formatZip, formatFullAddress, parseAddressQuery } from '@/lib/utils';
+import { detectRegulatedArea } from '@/lib/regulated';
 import type { SearchResult } from '@/types';
 import { MapPin, X } from 'lucide-react';
 
@@ -145,9 +146,30 @@ export function AddressSearch({ onSelect }: Props) {
                   Searching…
                 </li>
               ) : results.length === 0 ? (
-                <li className="px-4 py-3 text-sm text-slate-400">
-                  No addresses found for <span className="font-medium text-white">&quot;{street}&quot;</span>
-                  {zip ? ` in ${zip}` : ''}
+                <li className="px-4 py-3 text-sm">
+                  <p className="text-slate-300">
+                    No match for <span className="font-medium text-white">&quot;{street}&quot;</span>
+                    {zip ? ` in ${zip}` : ''}.
+                  </p>
+                  {(() => {
+                    const reg = detectRegulatedArea(query, zip);
+                    return reg ? (
+                      <p className="mt-2 text-slate-400 leading-relaxed">
+                        This looks like <span className="text-white">{reg.area}</span>, served by{' '}
+                        <span className="text-white">{reg.provider}</span> — a regulated utility
+                        outside Texas&apos;s deregulated market, so its addresses don&apos;t have a
+                        competitive ESID and won&apos;t appear here.
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-slate-400 leading-relaxed">
+                        If your address is served by a municipal utility or electric co-op — like{' '}
+                        <span className="text-white">Austin (Austin Energy)</span> or{' '}
+                        <span className="text-white">San Antonio (CPS Energy)</span> — it isn&apos;t
+                        part of Texas&apos;s deregulated market and won&apos;t be listed. Otherwise,
+                        check the spelling or add your ZIP.
+                      </p>
+                    );
+                  })()}
                 </li>
               ) : (
                 results.map((item, i) => (
