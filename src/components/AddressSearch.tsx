@@ -2,11 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { searchAddresses } from '@/lib/api';
 import { formatStreet, formatZip, formatFullAddress, parseAddressQuery } from '@/lib/utils';
+import { detectRegulatedArea } from '@/lib/regulated';
 import type { SearchResult } from '@/types';
 import { MapPin, X } from 'lucide-react';
 
 interface Props {
   onSelect: (esiId: string) => void;
+  /** Enter pressed with no suggestion to pick (empty results) — raw query text. */
+  onSubmit?: (raw: string) => void;
 }
 
 // Min street chars before searching. A ZIP scopes the query (cheap, >=2);
@@ -14,7 +17,7 @@ interface Props {
 const MIN_WITH_ZIP = 2;
 const MIN_NO_ZIP = 4;
 
-export function AddressSearch({ onSelect }: Props) {
+export function AddressSearch({ onSelect, onSubmit }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -82,7 +85,27 @@ export function AddressSearch({ onSelect }: Props) {
     addressRef.current?.focus();
   }
 
+  // Enter with nothing to pick: close the dropdown and hand the raw query up so the
+  // app can show a regulated-area / not-found card.
+  function submit() {
+    setResults([]);
+    setOpen(false);
+    setSelected(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    onSubmit?.(query);
+  }
+
   function handleKey(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') {
+      // Allow Enter even when the dropdown is closed/empty so users can submit a
+      // regulated-area address that returns no suggestions.
+      if (street.length < minLen) return;
+      e.preventDefault();
+      if (activeIndex >= 0) pick(results[activeIndex]);
+      else if (results.length > 0) pick(results[0]); // auto-pick top suggestion
+      else submit();
+      return;
+    }
     if (!open) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -90,9 +113,6 @@ export function AddressSearch({ onSelect }: Props) {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActiveIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' && activeIndex >= 0) {
-      e.preventDefault();
-      pick(results[activeIndex]);
     } else if (e.key === 'Escape') {
       setOpen(false);
     }
@@ -145,9 +165,30 @@ export function AddressSearch({ onSelect }: Props) {
                   Searching…
                 </li>
               ) : results.length === 0 ? (
-                <li className="px-4 py-3 text-sm text-slate-400">
-                  No addresses found for <span className="font-medium text-white">&quot;{street}&quot;</span>
-                  {zip ? ` in ${zip}` : ''}
+                <li className="px-4 py-3 text-sm">
+                  <p className="text-slate-300">
+                    No match for <span className="font-medium text-white">&quot;{street}&quot;</span>
+                    {zip ? ` in ${zip}` : ''}.
+                  </p>
+                  {(() => {
+                    const reg = detectRegulatedArea(query, zip);
+                    return reg ? (
+                      <p className="mt-2 text-slate-400 leading-relaxed">
+                        This looks like <span className="text-white">{reg.area}</span>, served by{' '}
+                        <span className="text-white">{reg.provider}</span> — a regulated utility
+                        outside Texas&apos;s deregulated market, so its addresses don&apos;t have a
+                        competitive ESID and won&apos;t appear here.
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-slate-400 leading-relaxed">
+                        If your address is served by a municipal utility or electric co-op — like{' '}
+                        <span className="text-white">Austin (Austin Energy)</span> or{' '}
+                        <span className="text-white">San Antonio (CPS Energy)</span> — it isn&apos;t
+                        part of Texas&apos;s deregulated market and won&apos;t be listed. Otherwise,
+                        check the spelling or add your ZIP.
+                      </p>
+                    );
+                  })()}
                 </li>
               ) : (
                 results.map((item, i) => (
